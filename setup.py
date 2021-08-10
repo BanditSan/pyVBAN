@@ -9,5 +9,5 @@ setup(
     install_requires=[
         'pyaudio',
     ],
-    py_modules=['pyVBAN.py'],
+    py_modules=['pyVBAN'],
 )
