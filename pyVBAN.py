@@ -5,7 +5,7 @@ import pyaudio
 
 class VBAN_Recv(object):
 	"""docstring for VBAN_Recv"""
-	def __init__(self, senderIp, streamName, port, outDeviceIndex ,verbose=False):
+	def __init__(self, senderIp, streamName, port, verbose=False, DeviceIndex=False):
 		super(VBAN_Recv, self).__init__()
 		self.streamName = streamName
 		self.senderIp = senderIp
@@ -16,7 +16,6 @@ class VBAN_Recv(object):
 		self.sampRate = 48000
 		self.channels = 2
 		self.dataFormat = 2
-		self.outDeviceIndex=outDeviceIndex
 		self.stream_magicString = ""
 		self.stream_sampRate = 0
 		self.stream_sampNum = 0
@@ -26,6 +25,10 @@ class VBAN_Recv(object):
 		self.stream_frameCounter = 0
 		self.p = pyaudio.PyAudio()
 		self.stream = self.p.open(format = self.p.get_format_from_width(self.dataFormat), channels = self.channels, rate = self.sampRate, output = True, output_device_index=self.outDeviceIndex)
+		if DeviceIndex is False:
+			self.outDeviceIndex = self.p.get_default_output_device_info().get('index')
+		else:
+			self.outDeviceIndex = DeviceIndex
 		self.rawPcm = None
 		self.running = True
 		self.verbose = verbose
@@ -63,7 +66,7 @@ class VBAN_Recv(object):
 		self.rawData = data
 		self._parseHeader(data)
 		if self.verbose:
-			print("R"+self.stream_magicString+" "+str(self.stream_sampRate)+"Hz "+str(self.stream_sampNum)+"samp "+str(self.stream_chanNum)+"chan Format:"+str(self.stream_dataFormat)+" Name:"+self.stream_streamName+" Frame:"+str(self.stream_frameCounter))
+			print("R"+self.stream_magicString+" "+str(self.stream_sampRate)+"Hz "+str(self.stream_sampNum)+"samp "+str(self.stream_chanNum)+"chan Format:"+str(self.stream_dataFormat)+" Name:"+self.stream_streamName+" Frame:"+str(self.stream_frameCounter)+" Device:"+str(self.outDeviceIndex))
 		self.rawPcm = data[28:]   #Header stops a 28
 		if self.stream_magicString == "VBAN" and self.subprotocol == 0:
 			if not self.stream_streamName == self.streamName:
@@ -86,25 +89,28 @@ class VBAN_Recv(object):
 
 class VBAN_Send(object):
 	"""docstring for VBAN_Send"""
-	def __init__(self, toIp, toPort, streamName, sampRate, inDeviceIndex, dataFormat, verbose=False ):
+	def __init__(self, toIp, toPort, streamName, sampRate, dataFormat, verbose=False, DeviceIndex=False):
 		super(VBAN_Send, self).__init__()
 		self.toIp = toIp
 		self.toPort = toPort
 		self.streamName = streamName
 		self.dataFormat = dataFormat
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) # UDP
-		self.sock.connect((self.toIp,self.toPort))
+		self.sock.connect((self.toIp, self.toPort))
 		self.const_VBAN_SR = [6000, 12000, 24000, 48000, 96000, 192000, 384000, 8000, 16000, 32000, 64000, 128000, 256000, 512000,11025, 22050, 44100, 88200, 176400, 352800, 705600]
 		self.p = pyaudio.PyAudio()
-		self.channels = min([self.p.get_device_info_by_host_api_device_index(0, inDeviceIndex).get('maxInputChannels'),2])
+		if DeviceIndex is False:
+			self.inDeviceIndex = self.p.get_default_output_device_info().get('index')
+		else:
+			self.inDeviceIndex = DeviceIndex
+		self.channels = min([self.p.get_device_info_by_host_api_device_index(0, self.inDeviceIndex).get('maxInputChannels'),2])
+		print(self.p.get_device_info_by_host_api_device_index(0, self.inDeviceIndex).get('maxInputChannels'))
 		if sampRate not in self.const_VBAN_SR:
 			print("SampRate not valid/compatible")
 			return
 		self.samprate = sampRate
-		self.inDeviceIndex = inDeviceIndex
 		self.chunkSize = 256
-		self.stream = self.p.open(format=self.p.get_format_from_width(self.dataFormat), channels=self.channels,rate=self.samprate, input=True,input_device_index = self.inDeviceIndex, frames_per_buffer=self.chunkSize)
-
+		self.stream = self.p.open(format=self.p.get_format_from_width(self.dataFormat), channels=self.channels, rate=self.samprate, input=True, input_device_index=self.inDeviceIndex, frames_per_buffer=self.chunkSize)
 		self.framecounter = 0
 		self.running = True
 		self.verbose = verbose
@@ -120,7 +126,7 @@ class VBAN_Send(object):
 		header += bytes(self.streamName + "\x00" * (16 - len(self.streamName)), 'utf-8')
 		header += struct.pack("<L",self.framecounter)
 		if self.verbose:
-			print("SVBAN "+str(self.samprate)+"Hz "+str(self.chunkSize)+"samp "+str(self.channels)+"chan Format:"+str(self.dataFormat - 1)+" Name:"+self.streamName+" Frame:"+str(self.framecounter))
+			print("SVBAN "+str(self.samprate)+"Hz "+str(self.chunkSize)+"samp "+str(self.channels)+"chan Format:"+str(self.dataFormat)+" Name:"+self.streamName+" Frame:"+str(self.framecounter)+" Device:"+str(self.inDeviceIndex))
 		return header+pcmData
 
 	def runonce(self):
