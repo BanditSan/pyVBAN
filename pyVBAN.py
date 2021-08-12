@@ -24,11 +24,11 @@ class VBAN_Recv(object):
 		self.stream_streamName = ""
 		self.stream_frameCounter = 0
 		self.p = pyaudio.PyAudio()
-		self.stream = self.p.open(format = self.p.get_format_from_width(self.dataFormat), channels = self.channels, rate = self.sampRate, output = True, output_device_index=self.outDeviceIndex)
 		if DeviceIndex is False:
 			self.outDeviceIndex = self.p.get_default_output_device_info().get('index')
 		else:
 			self.outDeviceIndex = DeviceIndex
+		self.stream = self.p.open(format = self.p.get_format_from_width(self.dataFormat), channels = self.channels, rate = self.sampRate, output = True, output_device_index=self.outDeviceIndex)
 		self.rawPcm = None
 		self.running = True
 		self.verbose = verbose
